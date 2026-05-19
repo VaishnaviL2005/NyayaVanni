@@ -144,8 +144,15 @@ export default function HireLawyer() {
     for (let i = 0; i < 7; i++) {
       const d = new Date();
       d.setDate(d.getDate() + i);
+
+      // Build a local yyyy-MM-dd string to avoid UTC timezone shifts when parsing later
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0'); // 1-based month
+      const dayNum = String(d.getDate()).padStart(2, '0');
+      const fullDate = `${year}-${month}-${dayNum}`;
+
       dates.push({
-        fullDate: d.toISOString().split("T")[0],
+        fullDate,
         dayName: d.toLocaleDateString(locale, { weekday: "short" }),
         dayNum: d.getDate(),
         month: d.toLocaleDateString(locale, { month: "short" }),
@@ -193,7 +200,10 @@ export default function HireLawyer() {
       .pop()
       .toUpperCase()}`;
 
-    const formattedDate = new Date(selectedDate).toLocaleDateString("en-US", {
+    // Parse the stored yyyy-MM-dd as local date parts to avoid UTC parsing issues
+    const [y, m, d] = selectedDate.split('-').map(Number); // m is 1-12
+    const localDateObj = new Date(y, m - 1, d); // monthIndex is 0-based
+    const formattedDate = localDateObj.toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
       month: "long",
