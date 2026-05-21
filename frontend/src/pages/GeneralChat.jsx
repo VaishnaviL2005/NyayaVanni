@@ -41,8 +41,33 @@ export default function GeneralChat() {
       });
 
       if (!response.ok) throw new Error("Chat failed");
-      const data = await response.json();
-      setChatHistory([...newHistory, { role: 'assistant', message: data.response }]);
+
+      // Set up a stream reader to consume the plaintext chunks
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let assistantMsg = '';
+
+      // Add a placeholder assistant message that will be progressively populated
+      setChatHistory([...newHistory, { role: 'assistant', message: '' }]);
+      setChatLoading(false); // Turn off loading state once streaming begins
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        if (value) {
+          const chunkValue = decoder.decode(value);
+          assistantMsg += chunkValue;
+          
+          setChatHistory(prev => {
+            const updated = [...prev];
+            if (updated.length > 0) {
+              updated[updated.length - 1] = { role: 'assistant', message: assistantMsg };
+            }
+            return updated;
+          });
+        }
+      }
     } catch (err) {
       console.error(err);
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -52,10 +77,8 @@ export default function GeneralChat() {
         errorMessage = "Configuration Error: The app is trying to connect to a local server (localhost) while deployed. Please set the VITE_API_URL environment variable in your Vercel dashboard.";
       }
 
-      setTimeout(() => {
-        setChatHistory([...newHistory, { role: 'assistant', message: errorMessage }]);
-        setChatLoading(false);
-      }, 1000);
+      setChatHistory([...newHistory, { role: 'assistant', message: errorMessage }]);
+      setChatLoading(false);
     } finally {
       setChatLoading(false);
     }

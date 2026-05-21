@@ -104,8 +104,33 @@ setKnowledgeGraph(data.knowledge_graph);
       });
 
       if (!response.ok) throw new Error("Chat failed");
-      const data = await response.json();
-      setChatHistory([...newHistory, { role: 'assistant', message: data.response }]);
+
+      // Set up a stream reader to consume the plaintext chunks
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let assistantMsg = '';
+
+      // Add a placeholder assistant message that will be progressively populated
+      setChatHistory([...newHistory, { role: 'assistant', message: '' }]);
+      setChatLoading(false); // Turn off loading state once streaming begins
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        if (value) {
+          const chunkValue = decoder.decode(value);
+          assistantMsg += chunkValue;
+          
+          setChatHistory(prev => {
+            const updated = [...prev];
+            if (updated.length > 0) {
+              updated[updated.length - 1] = { role: 'assistant', message: assistantMsg };
+            }
+            return updated;
+          });
+        }
+      }
     } catch (err) {
       console.error(err);
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -115,10 +140,8 @@ setKnowledgeGraph(data.knowledge_graph);
         msg = "Configuration Error: API URL is still set to localhost. Fix this in Vercel Environment Variables.";
       }
 
-      setTimeout(() => {
-        setChatHistory([...newHistory, { role: 'assistant', message: msg }]);
-        setChatLoading(false);
-      }, 1000);
+      setChatHistory([...newHistory, { role: 'assistant', message: msg }]);
+      setChatLoading(false);
     } finally {
       setChatLoading(false);
     }
