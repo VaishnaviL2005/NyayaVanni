@@ -49,10 +49,10 @@ const [selectedType, setSelectedType] = useState('all');
         if (file) formData.append('file', file);
         
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const sessionId = await ensureSessionId(apiUrl);
+        await ensureSessionId(apiUrl);
         const response = await fetch(`${apiUrl}/api/analyze/${documentId}?language=${language}`, {
           method: 'POST',
-          headers: { 'X-Session-Id': sessionId },
+          credentials: 'include',
           body: formData
         });
         
@@ -102,10 +102,11 @@ const [selectedType, setSelectedType] = useState('all');
 
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const sessionId = await ensureSessionId(apiUrl);
+      await ensureSessionId(apiUrl);
       const response = await fetch(`${apiUrl}/api/chat/${documentId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Session-Id': sessionId },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           user_message: userMsg.message,
           chat_history: chatHistory,
