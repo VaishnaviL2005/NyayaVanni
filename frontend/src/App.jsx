@@ -10,6 +10,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import DocumentGenerator from "./pages/DocumentGenerator";
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { Globe } from 'lucide-react';
 
 const LanguageToggle = () => {
@@ -28,10 +29,11 @@ const LanguageToggle = () => {
 
 function App() {
   return (
-    <LanguageProvider>
-      <Router>
-        {/* Permanently Dark Root Layout Wrapper */}
-        <div className="min-h-screen font-sans bg-slate-950 text-slate-100 selection:bg-nyaya-500 selection:text-white relative">
+    <ThemeProvider>
+      <LanguageProvider>
+        <Router>
+          {/* Theme-Responsive Root Layout Wrapper */}
+          <div className="min-h-screen font-sans bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 selection:bg-nyaya-500 selection:text-white relative transition-colors duration-300">
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/dashboard/:documentId" element={<Dashboard />} />
@@ -51,6 +53,7 @@ function App() {
         </div>
       </Router>
     </LanguageProvider>
+  </ThemeProvider>
   );
 }
 
