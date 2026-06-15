@@ -330,6 +330,8 @@ def chat_general(request: Request, chat_request: ChatRequest):
 
     except RateLimitExceeded:
         raise
+    except HTTPException as http_err:
+        raise
     except Exception as e:
         logger.error(f"General chat failed: {e}")
         raise HTTPException(status_code=500, detail="Chat generation failed")
