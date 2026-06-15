@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
 class ChatMessage(BaseModel):
     role: str
@@ -8,10 +8,21 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     user_message: str
     chat_history: List[ChatMessage]
-    # In a real app, we fetch document_analysis from DynamoDB using documentId
-    # For MVP portability, allow passing it in if needed, or just let backend fetch it.
+    language: str = "en"
     document_analysis: Optional[Dict[str, Any]] = None
-    language: Optional[str] = "en"
 
 class ChatResponse(BaseModel):
     response: str
+
+class ContactRequest(BaseModel):
+    name: str
+    email: str
+    subject: str
+    message: str
+
+class DocumentGenerationRequest(BaseModel):
+    party_one_name: str
+    party_two_name: str
+    effective_date: str
+    consideration_amount: str
+    jurisdiction: str

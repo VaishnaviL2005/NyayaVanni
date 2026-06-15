@@ -1,8 +1,52 @@
+# NyayaVanni Backend
+
+## Prerequisites & Setup
+
+### Required Environment Variables
+
+**GEMINI_API_KEY** (Required)
+- Enables document analysis and RAG (Retrieval-Augmented Generation) functionality
+- Obtain a free API key from: https://ai.google.dev
+- **The backend will fail to start if this variable is not set**
+
+### Setup Instructions
+
+1. Copy `.env.example` to `.env` in the `backend/` directory:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` and set your `GEMINI_API_KEY`:
+   ```bash
+   GEMINI_API_KEY=your_actual_api_key_here
+   ```
+
+3. Verify the key is valid by starting the backend:
+   ```bash
+   python main.py
+   ```
+   If the API key is missing or invalid, the backend will exit with a clear error message.
+
+---
+
 # NyayaVanni API Documentation
+
+## 0. Create Session
+**Endpoint:** `GET /api/session`
+**Response:**
+```json
+{
+  "sessionId": "uuid"
+}
+```
+
+Use the returned `sessionId` as the `X-Session-Id` header for all document-scoped requests.
 
 ## 1. Upload Document
 **Endpoint:** `POST /api/upload`
 **Content-Type:** `multipart/form-data`
+**Headers:**
+- `X-Session-Id`: Session identifier returned by `/api/session`
 **Parameters:**
 - `file`: The document (PDF, PNG, JPG)
 
@@ -17,6 +61,8 @@
 ## 2. Analyze Document
 **Endpoint:** `POST /api/analyze/{documentId}`
 **Content-Type:** `multipart/form-data` (MVP mode accepts file)
+**Headers:**
+- `X-Session-Id`: Session identifier returned by `/api/session`
 **Response:**
 ```json
 {
@@ -41,6 +87,8 @@
 ## 3. Chat with Document
 **Endpoint:** `POST /api/chat/{documentId}`
 **Content-Type:** `application/json`
+**Headers:**
+- `X-Session-Id`: Session identifier returned by `/api/session`
 **Body:**
 ```json
 {
@@ -58,3 +106,22 @@
   "response": "AI's helpful answer"
 }
 ```
+
+## 4. Delete Document
+**Endpoint:** `DELETE /api/documents/{documentId}`
+**Headers:**
+- `X-Session-Id`: Session identifier returned by `/api/session`
+
+**Response:**
+```json
+{
+  "documentId": "uuid",
+  "deleted": true
+}
+```
+
+## Data Lifecycle (MVP)
+- Stored data: uploaded file, extracted text, and analysis JSON.
+- Storage locations: `backend/uploads/` (file system) and `backend/data/nyayavanni.db` (SQLite).
+- Retention: data is stored until the document is deleted.
+- Deletion: call `DELETE /api/documents/{documentId}` with the correct `X-Session-Id`.
