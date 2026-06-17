@@ -123,7 +123,20 @@ async def create_session(request: Request, response: Response):
 @api_router.post("/upload")
 @limiter.limit(UPLOAD_RATE_LIMIT)
 async def upload_document(request: Request, file: UploadFile = File(...)):
-    """Upload document and return documentId"""
+    """Upload a legal document and return a document ID.
+
+    Args:
+        request: The incoming HTTP request.
+        file: The uploaded file (PDF, PNG, JPG, JPEG).
+
+    Returns:
+        dict: A dictionary containing the documentId and a success message.
+
+    Raises:
+        HTTPException 400: If the file format or MIME type is unsupported.
+        HTTPException 413: If the file exceeds the maximum allowed size.
+        HTTPException 500: If file save fails.
+    """
     try:
         session_id = require_session_id(request)
 
@@ -172,7 +185,22 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
 @api_router.post("/analyze/{document_id}")
 @limiter.limit(RATE_LIMIT_ANALYZE)
 def analyze_document(request: Request, document_id: str, language: str = "en", force_ocr: bool = False, file: UploadFile = File(None)):
-    """Trigger full analysis pipeline."""
+    """Trigger the full document analysis pipeline.
+
+    Args:
+        request: The incoming HTTP request.
+        document_id: The unique identifier of the document.
+        language: The target language for analysis (default "en").
+        force_ocr: Whether to force OCR re-processing (default False).
+        file: An optional new file to re-upload.
+
+    Returns:
+        dict: Analysis results including risk score, clause breakdown, and knowledge graph.
+
+    Raises:
+        HTTPException 404: If the document is not found.
+        HTTPException 500: If analysis fails.
+    """
     try:
         session_id = require_session_id(request)
         record = require_document_owner(document_id, session_id)
@@ -317,7 +345,19 @@ def chat_stream_sse(
 @api_router.post("/chat/general")
 @limiter.limit(RATE_LIMIT_CHAT)
 def chat_general(request: Request, chat_request: ChatRequest):
-    """General legal chat â€” no document context."""
+    """General legal chat - no document context.
+
+    Args:
+        request: The incoming HTTP request.
+        chat_request: The chat payload including message, history, and language.
+
+    Returns:
+        ChatResponse: The AI-generated chat response.
+
+    Raises:
+        HTTPException 400: If the message is empty.
+        HTTPException 500: If chat generation fails.
+    """
     try:
         if not chat_request.user_message or not chat_request.user_message.strip():
             raise HTTPException(status_code=400, detail="Message cannot be empty")
@@ -344,7 +384,20 @@ def chat_general(request: Request, chat_request: ChatRequest):
 @api_router.post("/chat/{document_id}")
 @limiter.limit(RATE_LIMIT_CHAT)
 def chat_with_document(request: Request, document_id: str, chat_request: ChatRequest):
-    """Send chat message with document context loaded server-side."""
+    """Send a chat message with document context loaded server-side.
+
+    Args:
+        request: The incoming HTTP request.
+        document_id: The document to use as context.
+        chat_request: The chat payload including message, history, and language.
+
+    Returns:
+        StreamingResponse: A streaming response with the AI-generated reply.
+
+    Raises:
+        HTTPException 404: If the document is not found.
+        HTTPException 500: If chat generation fails.
+    """
     try:
         session_id = require_session_id(request)
         require_document_owner(document_id, session_id)
