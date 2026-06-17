@@ -31,7 +31,21 @@ export default function RecentDocuments({ history, onClear }) {
   const [open, setOpen] = useState(true);
   const navigate = useNavigate();
 
-  if (!history || history.length === 0) return null;
+  if (!history || history.length === 0) {
+    return (
+      <div className="w-full rounded-2xl border border-slate-700/60 bg-slate-900/80 backdrop-blur-sm overflow-hidden">
+        <div className="flex flex-col items-center justify-center px-8 py-12 text-center">
+          <svg className="w-24 h-24 mb-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="0.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <h3 className="text-base font-semibold text-slate-400 mb-2">No documents yet</h3>
+          <p className="text-sm text-slate-500 max-w-xs">
+            Upload a legal document to get started with AI-powered analysis and risk assessment.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full rounded-2xl border border-slate-700/60 bg-slate-900/80 backdrop-blur-sm overflow-hidden">
