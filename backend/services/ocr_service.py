@@ -6,7 +6,7 @@ import os
 import docx
 import re
 import logging
-import docx
+import zipfile
 
 logger = logging.getLogger(__name__)
 
@@ -156,23 +156,6 @@ def extract_text_with_ocr_from_pdf(pdf_bytes: bytes, language: str = "en") -> st
     return text.strip()
 
 
-def extract_text_from_docx(docx_bytes: bytes) -> str:
-    """
-    Extract text from a Word document (.docx).
-    """
-    try:
-        doc = docx.Document(io.BytesIO(docx_bytes))
-        text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
-        
-        if is_invalid_extracted_text(text):
-            logger.warning("Docx extraction produced invalid or empty text.")
-            return ""
-            
-        return text
-    except Exception as e:
-        logger.error(f"Docx extraction failed: {e}")
-        raise ValueError("Failed to parse the Word Document.")
-
 def extract_text_from_image(image_bytes: bytes, language: str = "en") -> str:
     """
     Extract text from image using OCR.
@@ -229,10 +212,15 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
     Securely extract text from a Word Document.
     """
     validate_docx_zip_bomb(file_bytes)
-    
+
     try:
         doc = docx.Document(io.BytesIO(file_bytes))
-        text = "\n".join([para.text for para in doc.paragraphs])
+        text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+
+        if is_invalid_extracted_text(text):
+            logger.warning("Docx extraction produced invalid or empty text.")
+            return ""
+
         return text
     except Exception as e:
         logger.error(f"DOCX extraction failed: {e}")
@@ -268,11 +256,6 @@ def extract_document(
     elif ext in ['jpg', 'jpeg', 'png', 'tiff', 'bmp']:
 
         extracted_text = extract_text_from_image(file_bytes, language=language)
-
-    # DOCX
-    elif ext == 'docx':
-
-        extracted_text = extract_text_from_docx(file_bytes)
 
     else:
         raise ValueError(f"Unsupported file format: {ext}")

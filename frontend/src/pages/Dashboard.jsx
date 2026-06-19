@@ -7,7 +7,7 @@ import ReactFlow, {
   Background
 } from 'reactflow'; 
 import 'reactflow/dist/style.css';
-import { Scale, AlertTriangle, ArrowLeft, Calendar, FileText, Bot, Send, User, Users, AlertCircle, Briefcase, Search, Copy } from 'lucide-react';
+import { Scale, AlertTriangle, ArrowLeft, Calendar, FileText, Bot, Send, User, Users, AlertCircle, Briefcase, Search, Copy, Printer, Share2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ensureSessionId } from '../utils/session';
@@ -344,7 +344,7 @@ const [selectedType, _setSelectedType] = useState('all');
           });
         }
       }
-    } catch (err) {
+    } catch {
       //console.error(err);
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
       let msg = "This is a fallback response. The backend might not be running correctly.";
@@ -454,6 +454,13 @@ const graphEdges = knowledgeGraph?.edges?.filter((edge) => {
 
   return (
     <div className={MAIN_CONTAINER}>
+      <style>{`
+        @media print {
+          nav, form, button, .no-print { display: none !important; }
+          body { background: white !important; color: black !important; }
+          main { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+        }
+      `}</style>
       <nav className={NAV_BASE}>
         <div className={NAV_CONTAINER}>
           <div className="flex items-center gap-4">
@@ -464,12 +471,30 @@ const graphEdges = knowledgeGraph?.edges?.filter((edge) => {
               <Scale className="text-nyaya-500 w-6 h-6" /> NyayaVanni
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className={DOC_BADGE}>
-              Doc ID: {documentId.substring(0, 8)}...
-            </div>
-            <ThemeToggle />
-          </div>
+           <div className="flex items-center gap-3">
+             <div className={DOC_BADGE}>
+               Doc ID: {documentId.substring(0, 8)}...
+             </div>
+              <button
+                onClick={() => window.print()}
+                className="p-2 rounded-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 transition"
+                aria-label="Print report"
+              >
+                <Printer className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  const risk = classification?.risk_level || analysis?.risk_level || 'N/A';
+                  const body = `Document Analysis Report\n\nDocument: ${file?.name || 'Document'}\nRisk Level: ${risk}\n\nView full analysis: ${window.location.href}`;
+                  window.location.href = `mailto:?subject=Legal Document Analysis&body=${encodeURIComponent(body)}`;
+                }}
+                className="p-2 rounded-full bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 transition"
+                aria-label="Share analysis via email"
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
+             <ThemeToggle />
+           </div>
         </div>
         <div className="max-w-7xl mx-auto px-6 py-2 border-t border-slate-200 dark:border-slate-800">
           <Breadcrumb />

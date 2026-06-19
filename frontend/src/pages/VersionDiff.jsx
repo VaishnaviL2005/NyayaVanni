@@ -94,6 +94,7 @@ function DropZone({ label, file, onFile, onClear, gradientFrom, gradientTo }) {
   );
 }
 
+// eslint-disable-next-line no-unused-vars
 function ResultSection({ icon: Icon, title, iconClass, items, renderItem }) {
   if (!items || items.length === 0) return null;
   return (
@@ -249,7 +250,7 @@ function DiffResults({ data }) {
 
 export default function VersionDiff() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  useLanguage(); // Remove unused t variable
   const [oldFile, setOldFile] = useState(null);
   const [newFile, setNewFile] = useState(null);
   const [loading, setLoading] = useState(false);

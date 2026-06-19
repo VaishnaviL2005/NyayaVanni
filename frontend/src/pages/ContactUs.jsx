@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Mail, Phone, Clock, Send, CheckCircle, AlertCircle, MapPin } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -8,7 +8,7 @@ import { EN, HI, CONTACT_PLACEHOLDERS } from "../constants";
 
 export default function ContactUs() {
   const navigate = useNavigate();
-  const { language, t } = useLanguage();
+  const { language } = useLanguage();
 
   const L = language === 'en' ? EN : HI;
 
@@ -59,7 +59,7 @@ export default function ContactUs() {
 
       setSubmitStatus("success");
       setFormData({ name: "", email: "", subject: "", message: "" });
-    } catch (error) {
+    } catch {
       setSubmitStatus("error");
     } finally {
       setIsSubmitting(false);
@@ -75,7 +75,7 @@ export default function ContactUs() {
             onClick={() => navigate(-1)} 
             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 transition text-slate-700 dark:text-slate-200 cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" /> {language === 'en' ? 'Back' : 'à¤µà¤¾à¤ªà¤¸'}
+            <ArrowLeft className="w-4 h-4" /> {language === 'en' ? 'Back' : 'वापस'}
           </button>
           <ThemeToggle />
         </header>
@@ -95,8 +95,8 @@ export default function ContactUs() {
                 <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 p-4 rounded-xl flex items-start gap-3">
                   <CheckCircle className="w-5 h-5 mt-0.5 shrink-0" />
                   <div>
-                    <p className="font-semibold">{language === 'en' ? 'Message Sent!' : 'à¤¸à¤‚à¤¦à¥‡à¤¶ à¤­à¥‡à¤œà¤¾ à¤—à¤¯à¤¾!'}</p>
-                    <p className="text-sm mt-1">{language === 'en' ? 'Thank you for reaching out. We will get back to you shortly.' : 'à¤¸à¤‚à¤ªà¤°à¥à¤• à¤•à¤°à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤§à¤¨à¥à¤¯à¤µà¤¾à¤¦à¥¤ à¤¹à¤® à¤¶à¥€à¤˜à¥à¤° à¤¹à¥€ à¤†à¤ªà¤¸à¥‡ à¤¸à¤‚à¤ªà¤°à¥à¤• à¤•à¤°à¥‡à¤‚à¤—à¥‡à¥¤'}</p>
+                    <p className="font-semibold">{language === 'en' ? 'Message Sent!' : 'संदेश भेजा गया!'}</p>
+                    <p className="text-sm mt-1">{language === 'en' ? 'Thank you for reaching out. We will get back to you shortly.' : 'संपर्क करने के लिए धन्यवाद। हम शीघ्र ही आपसे संपर्क करेंगे।'}</p>
                   </div>
                 </div>
               )}
@@ -105,8 +105,8 @@ export default function ContactUs() {
                 <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 p-4 rounded-xl flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                   <div>
-                    <p className="font-semibold">{language === 'en' ? 'Failed to send message.' : 'à¤¸à¤‚à¤¦à¥‡à¤¶ à¤­à¥‡à¤œà¤¨à¥‡ à¤®à¥‡à¤‚ à¤µà¤¿à¤«à¤²à¥¤'}</p>
-                    <p className="text-sm mt-1">{language === 'en' ? 'Please try again later.' : 'à¤•à¥ƒà¤ªà¤¯à¤¾ à¤¬à¤¾à¤¦ à¤®à¥‡à¤‚ à¤ªà¥à¤¨à¤ƒ à¤ªà¥à¤°à¤¯à¤¾à¤¸ à¤•à¤°à¥‡à¤‚à¥¤'}</p>
+                    <p className="font-semibold">{language === 'en' ? 'Failed to send message.' : 'संदेश भेजने में विफल।'}</p>
+                    <p className="text-sm mt-1">{language === 'en' ? 'Please try again later.' : 'कृपया बाद में पुनः प्रयास करें।'}</p>
                   </div>
                 </div>
               )}

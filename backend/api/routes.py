@@ -1,4 +1,4 @@
-﻿import os
+import os
 import uuid
 import logging
 import io
@@ -26,6 +26,7 @@ from ..services.storage_service import (
     save_cached_analysis,
     get_cached_analysis,
     create_session_id,
+    validate_session,
     delete_document_and_cache,
     UPLOAD_DIR
 )
@@ -75,6 +76,8 @@ def require_session_id(request: Request) -> str:
     session_id = request.cookies.get("session_id")
     if not session_id:
         raise HTTPException(status_code=401, detail="Missing session_id cookie")
+    if not validate_session(session_id):
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
     return session_id
 
 
@@ -105,16 +108,18 @@ async def contact_us(request: Request, body: ContactRequest):
 
 
 @api_router.get("/session")
+@limiter.limit("10/minute")
 async def create_session(request: Request, response: Response):
     session_id = request.cookies.get("session_id")
-    if not session_id:
+    if not session_id or not validate_session(session_id):
         session_id = create_session_id()
+        session_secure = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
         response.set_cookie(
             key="session_id",
             value=session_id,
             httponly=True,
             samesite="lax",
-            secure=False,  # Set to True if using HTTPS in production
+            secure=session_secure,
             max_age=30 * 24 * 60 * 60  # 30 days
         )
     return {"status": "Session active"}
@@ -123,7 +128,20 @@ async def create_session(request: Request, response: Response):
 @api_router.post("/upload")
 @limiter.limit(UPLOAD_RATE_LIMIT)
 async def upload_document(request: Request, file: UploadFile = File(...)):
-    """Upload document and return documentId"""
+    """Upload a legal document and return a document ID.
+
+    Args:
+        request: The incoming HTTP request.
+        file: The uploaded file (PDF, PNG, JPG, JPEG).
+
+    Returns:
+        dict: A dictionary containing the documentId and a success message.
+
+    Raises:
+        HTTPException 400: If the file format or MIME type is unsupported.
+        HTTPException 413: If the file exceeds the maximum allowed size.
+        HTTPException 500: If file save fails.
+    """
     try:
         session_id = require_session_id(request)
 
@@ -158,7 +176,8 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
         except Exception as e:
             if os.path.exists(local_path):
                 os.remove(local_path)
-            raise HTTPException(status_code=500, detail=f"File save failed: {str(e)}")
+            logger.error("File save failed: %s", e, exc_info=True)
+            raise HTTPException(status_code=500, detail="An internal error occurred while saving the file.")
 
         save_document_record(session_id, doc_id, filename, local_path)
         return {"documentId": doc_id, "message": "Uploaded successfully"}
@@ -166,13 +185,29 @@ async def upload_document(request: Request, file: UploadFile = File(...)):
     except HTTPException as http_err:
         raise http_err
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Unexpected upload error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred during upload.")
 
 
 @api_router.post("/analyze/{document_id}")
 @limiter.limit(RATE_LIMIT_ANALYZE)
 def analyze_document(request: Request, document_id: str, language: str = "en", force_ocr: bool = False, file: UploadFile = File(None)):
-    """Trigger full analysis pipeline."""
+    """Trigger the full document analysis pipeline.
+
+    Args:
+        request: The incoming HTTP request.
+        document_id: The unique identifier of the document.
+        language: The target language for analysis (default "en").
+        force_ocr: Whether to force OCR re-processing (default False).
+        file: An optional new file to re-upload.
+
+    Returns:
+        dict: Analysis results including risk score, clause breakdown, and knowledge graph.
+
+    Raises:
+        HTTPException 404: If the document is not found.
+        HTTPException 500: If analysis fails.
+    """
     try:
         session_id = require_session_id(request)
         record = require_document_owner(document_id, session_id)
@@ -241,7 +276,8 @@ def analyze_document(request: Request, document_id: str, language: str = "en", f
     except HTTPException as http_err:
         raise http_err
     except ValueError as val_err:
-        raise HTTPException(status_code=400, detail=str(val_err))
+        logger.error("ValueError in analysis: %s", val_err, exc_info=True)
+        raise HTTPException(status_code=400, detail="Invalid input or configuration in analysis request.")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Requested document file not found on storage.")
     except Exception as e:
@@ -317,7 +353,19 @@ def chat_stream_sse(
 @api_router.post("/chat/general")
 @limiter.limit(RATE_LIMIT_CHAT)
 def chat_general(request: Request, chat_request: ChatRequest):
-    """General legal chat â€” no document context."""
+    """General legal chat - no document context.
+
+    Args:
+        request: The incoming HTTP request.
+        chat_request: The chat payload including message, history, and language.
+
+    Returns:
+        ChatResponse: The AI-generated chat response.
+
+    Raises:
+        HTTPException 400: If the message is empty.
+        HTTPException 500: If chat generation fails.
+    """
     try:
         if not chat_request.user_message or not chat_request.user_message.strip():
             raise HTTPException(status_code=400, detail="Message cannot be empty")
@@ -344,7 +392,20 @@ def chat_general(request: Request, chat_request: ChatRequest):
 @api_router.post("/chat/{document_id}")
 @limiter.limit(RATE_LIMIT_CHAT)
 def chat_with_document(request: Request, document_id: str, chat_request: ChatRequest):
-    """Send chat message with document context loaded server-side."""
+    """Send a chat message with document context loaded server-side.
+
+    Args:
+        request: The incoming HTTP request.
+        document_id: The document to use as context.
+        chat_request: The chat payload including message, history, and language.
+
+    Returns:
+        StreamingResponse: A streaming response with the AI-generated reply.
+
+    Raises:
+        HTTPException 404: If the document is not found.
+        HTTPException 500: If chat generation fails.
+    """
     try:
         session_id = require_session_id(request)
         require_document_owner(document_id, session_id)
@@ -517,12 +578,15 @@ async def delete_document(document_id: str, request: Request):
 
 @api_router.get("/search")
 def search_documents_endpoint(
+    request: Request,
     q: str,
     page: int = 1,
     page_size: int = 10
 ):
     """
     Search indexed documents using full-text search.
+
+    Requires a valid session_id cookie for authentication.
 
     Fast document search with results cached for 1 hour. Queries return
     in under 500ms using SQLite FTS5 full-text indexing instead of slow
@@ -541,6 +605,8 @@ def search_documents_endpoint(
         - from_cache: Whether results came from cache
     """
     try:
+        session_id = require_session_id(request)
+
         if not q or len(q.strip()) < 2:
             raise HTTPException(
                 status_code=400,
