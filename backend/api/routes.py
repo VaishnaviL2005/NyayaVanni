@@ -441,6 +441,8 @@ def chat_with_document(request: Request, document_id: str, chat_request: ChatReq
 def diff_analysis(request: Request, old_document: UploadFile = File(...), new_document: UploadFile = File(...)):
     """Compare two document versions and return a structured difference analysis."""
     try:
+        session_id = require_session_id(request)
+        
         old_contents = old_document.file.read()
         new_contents = new_document.file.read()
 
@@ -511,6 +513,8 @@ Provide a JSON response matching this exact schema:
 def generate_document(request: Request, payload: DocumentGenerationRequest):
     """Generates a standard NDA document as a PDF based on provided details."""
     try:
+        session_id = require_session_id(request)
+        
         buffer = io.BytesIO()
         c = canvas.Canvas(buffer, pagesize=letter)
         width, height = letter
