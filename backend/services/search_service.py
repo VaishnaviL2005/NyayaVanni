@@ -6,11 +6,12 @@ with pagination and caching to minimize database queries and improve
 response times from 5-10 seconds to under 500ms.
 """
 
-import sqlite3
-import logging
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
 import hashlib
+import logging
+import re
+import sqlite3
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 from .database import connect_db
 
@@ -20,6 +21,13 @@ DB_PATH = None  # Set by init_search_service()
 
 # Search result cache expires after 1 hour
 CACHE_EXPIRY_SECONDS = 3600
+
+
+def _sanitize_fts_query(query: str) -> str:
+    """Strip FTS5 special characters to prevent syntax errors."""
+    sanitized = re.sub(r'["*(){}^:+\-]', " ", query)
+    sanitized = re.sub(r"\s+", " ", sanitized).strip()
+    return sanitized
 
 
 def _connect_db():
@@ -50,17 +58,17 @@ def _create_fts_index():
         cursor = conn.cursor()
 
         # Create FTS5 virtual table for document indexing
-        cursor.execute('''
+        cursor.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
                 document_id,
                 filename,
                 content,
                 tokenize = 'porter ascii'
             )
-        ''')
+        """)
 
         # Create search cache table
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS search_cache (
                 query_hash TEXT PRIMARY KEY,
                 query TEXT,
@@ -70,13 +78,13 @@ def _create_fts_index():
                 total_count INTEGER,
                 created_at TEXT
             )
-        ''')
+        """)
 
         # Create index on created_at for cache cleanup
-        cursor.execute('''
+        cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_search_cache_created_at
             ON search_cache(created_at)
-        ''')
+        """)
 
         conn.commit()
         conn.close()
@@ -104,15 +112,17 @@ def index_document(document_id: str, filename: str, content: str):
 
         # Remove existing document index if present
         cursor.execute(
-            'DELETE FROM documents_fts WHERE document_id = ?',
-            (document_id,)
+            "DELETE FROM documents_fts WHERE document_id = ?", (document_id,)
         )
 
         # Insert document into FTS index
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT INTO documents_fts (document_id, filename, content)
             VALUES (?, ?, ?)
-        ''', (document_id, filename, content))
+        """,
+            (document_id, filename, content),
+        )
 
         conn.commit()
         conn.close()
@@ -122,10 +132,7 @@ def index_document(document_id: str, filename: str, content: str):
 
 
 def search_documents(
-    query: str,
-    page: int = 1,
-    page_size: int = 10,
-    use_cache: bool = True
+    query: str, page: int = 1, page_size: int = 10, use_cache: bool = True
 ) -> Dict[str, Any]:
     """
     Search documents using full-text search with caching.
@@ -149,7 +156,11 @@ def search_documents(
     """
     if not DB_PATH:
         logger.error("DB_PATH not set. Call init_search_service first.")
-        return {"results": [], "total_count": 0, "error": "Search service not initialized"}
+        return {
+            "results": [],
+            "total_count": 0,
+            "error": "Search service not initialized",
+        }
 
     # Validate input
     if not query or not query.strip():
@@ -174,21 +185,31 @@ def search_documents(
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
+        safe_query = _sanitize_fts_query(query.strip())
+        if not safe_query:
+            return {"results": [], "total_count": 0, "from_cache": False}
+
         # Count total matching documents
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT COUNT(*) as count FROM documents_fts
             WHERE documents_fts MATCH ?
-        ''', (query.strip(),))
-        total_count = cursor.fetchone()['count']
+        """,
+            (safe_query,),
+        )
+        total_count = cursor.fetchone()["count"]
 
         # Fetch paginated results with relevance ranking
         offset = (page - 1) * page_size
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT document_id, filename, rank FROM documents_fts
             WHERE documents_fts MATCH ?
             ORDER BY rank
             LIMIT ? OFFSET ?
-        ''', (query.strip(), page_size, offset))
+        """,
+            (safe_query, page_size, offset),
+        )
 
         results = [dict(row) for row in cursor.fetchall()]
         conn.close()
@@ -198,7 +219,7 @@ def search_documents(
             "total_count": total_count,
             "page": page,
             "page_size": page_size,
-            "from_cache": False
+            "from_cache": False,
         }
 
         # Cache the result
@@ -208,12 +229,7 @@ def search_documents(
 
     except Exception as e:
         logger.error(f"Search failed for query '{query}': {e}")
-        return {
-            "results": [],
-            "total_count": 0,
-            "error": str(e),
-            "from_cache": False
-        }
+        return {"results": [], "total_count": 0, "error": str(e), "from_cache": False}
 
 
 def _get_cached_result(query_hash: str) -> Optional[Dict[str, Any]]:
@@ -225,11 +241,14 @@ def _get_cached_result(query_hash: str) -> Optional[Dict[str, Any]]:
         conn = _connect_db()
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             SELECT query, results, page, page_size, total_count, created_at
             FROM search_cache
             WHERE query_hash = ?
-        ''', (query_hash,))
+        """,
+            (query_hash,),
+        )
 
         row = cursor.fetchone()
         conn.close()
@@ -244,12 +263,13 @@ def _get_cached_result(query_hash: str) -> Optional[Dict[str, Any]]:
             return None
 
         import json
+
         return {
             "results": json.loads(row[1]),
             "page": row[2],
             "page_size": row[3],
             "total_count": row[4],
-            "from_cache": True
+            "from_cache": True,
         }
 
     except Exception as e:
@@ -263,7 +283,7 @@ def _cache_result(
     response: Dict[str, Any],
     page: int,
     page_size: int,
-    total_count: int
+    total_count: int,
 ):
     """Store search result in cache."""
     if not DB_PATH:
@@ -271,22 +291,26 @@ def _cache_result(
 
     try:
         import json
+
         conn = _connect_db()
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO search_cache
             (query_hash, query, results, page, page_size, total_count, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            query_hash,
-            query,
-            json.dumps(response["results"]),
-            page,
-            page_size,
-            total_count,
-            datetime.now().isoformat()
-        ))
+        """,
+            (
+                query_hash,
+                query,
+                json.dumps(response["results"]),
+                page,
+                page_size,
+                total_count,
+                datetime.now().isoformat(),
+            ),
+        )
 
         conn.commit()
         conn.close()
@@ -302,7 +326,7 @@ def _delete_cache_entry(query_hash: str):
     try:
         conn = _connect_db()
         cursor = conn.cursor()
-        cursor.execute('DELETE FROM search_cache WHERE query_hash = ?', (query_hash,))
+        cursor.execute("DELETE FROM search_cache WHERE query_hash = ?", (query_hash,))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -318,11 +342,10 @@ def clear_expired_cache():
         conn = _connect_db()
         cursor = conn.cursor()
 
-        cutoff_time = (datetime.now() - timedelta(seconds=CACHE_EXPIRY_SECONDS)).isoformat()
-        cursor.execute(
-            'DELETE FROM search_cache WHERE created_at < ?',
-            (cutoff_time,)
-        )
+        cutoff_time = (
+            datetime.now() - timedelta(seconds=CACHE_EXPIRY_SECONDS)
+        ).isoformat()
+        cursor.execute("DELETE FROM search_cache WHERE created_at < ?", (cutoff_time,))
 
         conn.commit()
         deleted = cursor.rowcount
@@ -343,8 +366,7 @@ def remove_document_from_index(document_id: str):
         conn = _connect_db()
         cursor = conn.cursor()
         cursor.execute(
-            'DELETE FROM documents_fts WHERE document_id = ?',
-            (document_id,)
+            "DELETE FROM documents_fts WHERE document_id = ?", (document_id,)
         )
         conn.commit()
         conn.close()
