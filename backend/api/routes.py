@@ -388,10 +388,20 @@ def analyze_document(
 def chat_stream_sse(
     request: Request, user_message: str, language: str = "en", document_id: str = None
 ):
-    """
-    SSE endpoint for real-time token-by-token streaming.
-    Returns text/event-stream for EventSource-compatible clients.
-    Usage: GET /chat/stream?user_message=hello&language=en
+    """Stream chat responses as Server-Sent Events (SSE).
+
+    Args:
+        request: The incoming HTTP request.
+        user_message: The user's chat message (query parameter).
+        language: The target language for the response (default "en").
+        document_id: Optional document ID to load analysis context.
+
+    Returns:
+        StreamingResponse: A text/event-stream response with token-by-token chunks.
+
+    Raises:
+        HTTPException 400: If the user message is empty.
+        HTTPException 429: If the rate limit is exceeded.
     """
     import json as _json
 
