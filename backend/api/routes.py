@@ -17,7 +17,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from ..config.rate_limits import CONTACT_RATE_LIMIT, UPLOAD_RATE_LIMIT
+from ..config.rate_limits import CONTACT_RATE_LIMIT, DELETE_RATE_LIMIT, UPLOAD_RATE_LIMIT
 from ..models.schemas import ChatRequest, ChatResponse, ContactRequest
 from ..services.confidence_service import ConfidenceService
 from ..services.document_classifier import classify_document
@@ -606,6 +606,7 @@ def generate_document(request: Request, payload: DocumentGenerationRequest):
 
 
 @api_router.delete("/documents/{document_id}")
+@limiter.limit(DELETE_RATE_LIMIT)
 async def delete_document(document_id: str, request: Request):
     session_id = require_session_id(request)
     require_document_owner(document_id, session_id)

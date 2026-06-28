@@ -11,3 +11,5 @@ CHAT_RATE_LIMIT = os.getenv("CHAT_RATE_LIMIT", "20/minute")
 GENERAL_CHAT_RATE_LIMIT = os.getenv("GENERAL_CHAT_RATE_LIMIT", "30/minute")
 
 CONTACT_RATE_LIMIT = os.getenv("CONTACT_RATE_LIMIT", "3/minute")
+
+DELETE_RATE_LIMIT = os.getenv("DELETE_RATE_LIMIT", "10/minute")
