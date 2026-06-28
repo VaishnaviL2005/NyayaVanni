@@ -114,6 +114,7 @@ export default function Footer() {
               <div className="flex flex-col gap-2 text-slate-700 dark:text-slate-400 text-sm">
                 <a
                   href="mailto:support@nyayavanni.com"
+                  aria-label="Email Support"
                   className="hover:text-nyaya-600 dark:hover:text-white transition duration-250 flex items-center gap-1.5"
                 >
                   <Mail className="w-4 h-4 shrink-0" />
