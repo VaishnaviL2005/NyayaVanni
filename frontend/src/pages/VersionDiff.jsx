@@ -48,16 +48,35 @@ function SeverityBadge({ level }) {
 function DropZone({ label, file, onFile, onClear, gradientFrom, gradientTo }) {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
+  const [dragError, setDragError] = useState(false);
+  const allowedTypes = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+];
+
+const isValidFile = (file) => {
+  return file && allowedTypes.includes(file.type);
+};
 
   const handleDrop = useCallback(
-    (e) => {
-      e.preventDefault();
-      setDragging(false);
-      const dropped = e.dataTransfer.files[0];
-      if (dropped) onFile(dropped);
-    },
-    [onFile]
-  );
+  (e) => {
+    e.preventDefault();
+    setDragging(false);
+
+    const dropped = e.dataTransfer.files[0];
+    if (!dropped) return;
+
+    if (!isValidFile(dropped)) {
+      setDragError(true);
+      return;
+    }
+
+    setDragError(false);
+    onFile(dropped);
+  },
+  [onFile]
+);
 
   return (
     <div
@@ -71,19 +90,42 @@ function DropZone({ label, file, onFile, onClear, gradientFrom, gradientTo }) {
       ></div>
       <div
         className={`h-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-4xl p-8 border-2 transition-all duration-300 flex flex-col items-center justify-center min-h-72 ${
-          dragging
+          dragError
+          ? 'border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.3)]'
+          : dragging
             ? 'border-nyaya-500 shadow-[0_0_30px_rgba(37,99,235,0.2)]'
             : 'border-slate-200 dark:border-slate-700/50 hover:border-slate-350 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:-translate-y-2 cursor-pointer'
         }`}
         onDragEnter={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
+  e.preventDefault();
+
+  const draggedFile = e.dataTransfer.items?.[0];
+
+  if (draggedFile && !allowedTypes.includes(draggedFile.type)) {
+    setDragError(true);
+    setDragging(false);
+  } else {
+    setDragError(false);
+    setDragging(true);
+  }
+}}
+        onDragLeave={() => {
+  setDragging(false);
+  setDragError(false);
+}}
         onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
+  e.preventDefault();
+
+  const draggedFile = e.dataTransfer.items?.[0];
+
+  if (draggedFile && !allowedTypes.includes(draggedFile.type)) {
+    setDragError(true);
+    setDragging(false);
+  } else {
+    setDragError(false);
+    setDragging(true);
+  }
+}}
         onDrop={handleDrop}
         onClick={() => !file && inputRef.current?.click()}
       >
@@ -96,6 +138,11 @@ function DropZone({ label, file, onFile, onClear, gradientFrom, gradientTo }) {
             if (e.target.files?.[0]) onFile(e.target.files[0]);
           }}
         />
+        {dragError && (
+  <p className="mb-4 text-sm font-medium text-red-600 dark:text-red-400">
+    Unsupported file type. Please upload a PDF, PNG, or JPG.
+  </p>
+)}
         <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-5">
           {label}
         </p>
