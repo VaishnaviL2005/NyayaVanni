@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileText, Loader2, Scale, Sparkles } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
+import Footer from "../components/Footer";
 
 const FIELD_CONFIG = [
   {
@@ -260,6 +261,7 @@ export default function DocumentGenerator() {
           </div>
         </form>
       </main>
+      <Footer/>
     </div>
   );
 }
