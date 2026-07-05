@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 google-generativeai
-faiss-cpu
+chromadb
 numpy
 PyMuPDF
 pytesseract
@@ -16,5 +16,3 @@ gunicorn
 reportlab
 python-docx
 slowapi
-reportlab
-python-docx

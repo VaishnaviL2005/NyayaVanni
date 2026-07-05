@@ -1,10 +1,10 @@
-import faiss
 import numpy as np
 import google.generativeai as genai
 import json
 import os
 import logging
 from dotenv import load_dotenv
+import chromadb
 
 load_dotenv(override=True)
 logger = logging.getLogger(__name__)
@@ -16,7 +16,6 @@ if not api_key or not api_key.strip():
         "GEMINI_API_KEY environment variable is not set or empty. "
         "RAG features will be unavailable until configured."
     )
-
 else:
     genai.configure(api_key=api_key)
 
@@ -39,75 +38,83 @@ except FileNotFoundError:
         f"RAG system degraded: legal_corpus.json not found at {CORPUS_PATH}. "
         "Operating in fallback mode."
     )
-
 except Exception as e:
     logger.error(
         f"RAG system degraded: failed to load corpus: {e}"
     )
 
-# Initialize FAISS Index
-index = None
-corpus_embeddings = None
+# Initialize ChromaDB
+chroma_host = os.getenv("CHROMA_HOST")
+if chroma_host and chroma_host.strip():
+    chroma_port = int(os.getenv("CHROMA_PORT", 8000))
+    logger.info(f"Connecting to ChromaDB Server at {chroma_host}:{chroma_port}...")
+    chroma_client = chromadb.HttpClient(host=chroma_host.strip(), port=chroma_port)
+else:
+    logger.info("CHROMA_HOST not set. Falling back to local PersistentClient...")
+    chroma_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'chroma_db')
+    chroma_client = chromadb.PersistentClient(path=chroma_path)
 
-def get_embeddings(texts: list) -> np.ndarray:
+collection = chroma_client.get_or_create_collection(name="legal_corpus")
+
+def get_embeddings(texts: list) -> list:
     try:
         if not texts or not os.getenv("GEMINI_API_KEY"):
-            return np.array([])
+            return []
         result = genai.embed_content(
             model="models/gemini-embedding-001",
             content=texts,
             task_type="retrieval_document",
         )
-        return np.array(result['embedding'], dtype=np.float32)
+        return result['embedding']
     except Exception as e:
         logger.error(f"Embedding generation failed: {e}")
-        return np.array([])
+        return []
 
 def build_index():
-    global corpus_embeddings, index
-
     if not legal_corpus:
         logger.warning(
-            "RAG system degraded: skipping FAISS build (empty corpus)."
+            "RAG system degraded: skipping Chroma build (empty corpus)."
         )
         return
 
-    logger.info("Building FAISS index...")
+    logger.info("Building ChromaDB collection...")
+    
+    # Check if already indexed
+    if collection.count() > 0:
+        logger.info("ChromaDB collection already populated. Skipping build.")
+        return
 
-    corpus_embeddings = get_embeddings(legal_corpus)
-
-    if corpus_embeddings is None or corpus_embeddings.size == 0:
+    embeddings = get_embeddings(legal_corpus)
+    
+    if not embeddings or len(embeddings) == 0:
         logger.warning(
             "RAG system degraded: embedding generation failed."
         )
         return
 
-    d = corpus_embeddings.shape[1]
-    index = faiss.IndexFlatL2(d)
-    index.add(corpus_embeddings)
-
-# Build immediately on module import (MVP approach)
-
-INDEX_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'faiss_index.bin')
+    # Upsert into Chroma
+    ids = [str(i) for i in range(len(legal_corpus))]
+    collection.upsert(
+        ids=ids,
+        embeddings=embeddings,
+        documents=legal_corpus
+    )
+    logger.info("Successfully populated ChromaDB collection.")
 
 def init_index():
-    global index
-    if os.path.exists(INDEX_PATH):
-        logger.info("Loading cached FAISS index from disk...")
-        index = faiss.read_index(INDEX_PATH)
+    if collection.count() > 0:
+        logger.info("ChromaDB index found. Loaded successfully.")
     else:
-        logger.info("No cache found. Building FAISS index from Gemini API...")
+        logger.info("No cache found. Building ChromaDB index from Gemini API...")
         build_index()
-        if index is not None:
-            faiss.write_index(index, INDEX_PATH)
 
 init_index()
 
 def retrieve_relevant_laws(query_text: str, k=2) -> list:
-    """Search FAISS for the most relevant laws given the document's extracted text or sections"""
-    if index is None or index.ntotal == 0:
+    """Search ChromaDB for the most relevant laws given the document's extracted text or sections"""
+    if collection.count() == 0:
         logger.warning(
-            "RAG system degraded: FAISS index unavailable or empty. "
+            "RAG system degraded: ChromaDB collection unavailable or empty. "
             "Returning no legal context."
         )
         return []
@@ -119,21 +126,18 @@ def retrieve_relevant_laws(query_text: str, k=2) -> list:
             task_type="retrieval_query",
         )
 
-        query_vec = np.array([query_embed["embedding"]], dtype=np.float32)
-        distances, indices = index.search(query_vec, k)
+        results = collection.query(
+            query_embeddings=[query_embed["embedding"]],
+            n_results=k
+        )
 
-        results = [
-            legal_corpus[i]
-            for i in indices[0]
-            if i != -1 and i < len(legal_corpus)
-        ]
-
-        if len(results) == 0:
+        if not results['documents'] or len(results['documents'][0]) == 0:
             logger.warning(
                 "RAG system degraded: no retrieval results for query."
             )
+            return []
 
-        return results
+        return results['documents'][0]
 
     except Exception as e:
         logger.error(
